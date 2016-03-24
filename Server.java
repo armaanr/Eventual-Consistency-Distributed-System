@@ -8,33 +8,20 @@ public class Server extends Thread
    public ServerSocket serverSocket;
    
    //contains the information about all processes
-   public Map<Integer, ProcessInfo> otherProcesses;
+   public Map<Integer, ProcessInfo> replicas;
+   public Map<Integer, ProcessInfo> clients;
+   public int maxClient;
+   public String outputFileName;
    public int min_delay;
    public int max_delay;
    
-   //check if Total(1) or Causal(2)
-   public int multCheck;
-   
-   //for Causal Ordering
-   CausalOrderMulticaster causalOrder;
-   
-   //for total ordering
-   public static int globalSequence;
-   public boolean multicastLeader;
-   public TotalOrderMulticaster totalOrder;
-   
    public Server(int port) throws IOException
    {
-      serverSocket = new ServerSocket(port);
-      otherProcesses = new HashMap<Integer, ProcessInfo>();
-      serverSocket.setSoTimeout(150000);
-      globalSequence = 1;
-      
-      this.multCheck = -1;
-      this.multicastLeader = false;
-      this.totalOrder = new TotalOrderMulticaster();
-      
-      causalOrder = new CausalOrderMulticaster();
+      this.serverSocket = new ServerSocket(port);
+      this.replicas = new HashMap<Integer, ProcessInfo>();
+      this.clients = new HashMap<Integer, ProcessInfo>();
+      this.outputFileName = "outputs/output_log";
+      this.maxClient = 0;
    }
    
    //Parses the given config file to initialize the Server variables
@@ -43,6 +30,7 @@ public class Server extends Thread
 	   @SuppressWarnings("resource")
 	   Scanner scanner = new Scanner(file);
 	   
+	   //sets up delays
 	   if(scanner.hasNext())
 	   {
 		   String[] delays = scanner.nextLine().split(" ");
@@ -50,6 +38,7 @@ public class Server extends Thread
 		   this.max_delay = Integer.parseInt(delays[1]);
 	   }
 
+	   //populates hashmap containing information for all replicas
 	   while(scanner.hasNext())
 	   {
 		    String[] tokens = scanner.nextLine().split(" ");
@@ -57,19 +46,19 @@ public class Server extends Thread
 		    int id = Integer.parseInt(tokens[0]);
 		    InetAddress ip = InetAddress.getByName(tokens[1]);
 	        int port = Integer.parseInt(tokens[2]); 
-		    
+	           
 		    ProcessInfo procInfo = new ProcessInfo(ip, port);
 		    
-		    otherProcesses.put(id, procInfo);
-		    
+		    replicas.put(id, procInfo);    
 	    }
 	   
-	   if(otherProcesses.get(1).getPort() == this.serverSocket.getLocalPort())
-	   {
-		   this.multicastLeader = true;
-	   }
+	    //sets the name of the output file
+	    int currProcess = processIdentifier(this.serverSocket.getLocalPort());
+	    String processName = Integer.toString(currProcess).concat(".txt"); 
+	   	this.outputFileName = this.outputFileName.concat(processName);
 	   
-	   
+	   	System.out.println(outputFileName);
+	    
    }
    
    
@@ -80,287 +69,196 @@ public class Server extends Thread
 	   
 	   System.out.println("Waiting for client on port " + serverSocket.getLocalPort() + "...");
        Socket server = this.serverSocket.accept();
+       int clientId = -1;
        
+       System.out.println(server.getRemoteSocketAddress());
+       
+       clientId = clientAdder(server);
+       
+       System.out.println("clientId = " + clientId);
        
        //receives message
        DataInputStream in = new DataInputStream(server.getInputStream());
        String message = "";
        message = in.readUTF();   
-       String[] cmd = message.split(" ");
+       message = "d";
+       char[] cmd = message.toCharArray();
+       char cmdType = cmd[0];
+       
        
        //handles 'send' commands from command line
-       if(cmd[cmd.length - 1].equals("cmd"))
+       if(cmdType == 'p')
        {
-    	   unicastHandler(cmd);   
+    	   putHandler(cmd, clientId);   
     	  
        }
-       //handles 'msend' commands from command line
-       else if(cmd[cmd.length - 1].equals("mcmd"))
+       else if(cmdType == 'g')
        {
-    	   multicastHandler(cmd);
+    	   getHandler(cmd, clientId); 
        }
-       //handles proxy messages sent to leader from other processes(TOTAL ORDERING)
-       else if(cmd[cmd.length - 2].equals("msendproxy"))
+       else if(cmdType == 'd')
        {
-    	   int sendPort = Integer.parseInt(cmd[cmd.length - 1]);
-    	   leaderSendHandler(cmd, sendPort);
+    	   dumpHandler(cmd, clientId); 
        }
-       //handles messages if sent from a leader(TOTAL ORDERING)
-       else if(cmd[cmd.length - 2].equals("leader"))
-       {
-    	   globalSequence++;
-    	   multicast_recieve(cmd);
-       }
-       //handles messages sent with vector clock(CAUSAL ORDERING)
-       else if(cmd[cmd.length - 2].equals("causal"))
-       {   
-    	   causalOrderHandler(cmd);   	   
-       }
-       else
-       {
-    	   unicast_recieve(server, message);
-       }
-       
        
        server.close();
-       multicastBufferChecks();
        
    }
 
-//Runs loops on the multicast buffers to check if they are eligible for delivery
-private void multicastBufferChecks() {
-	
-		//Checks according to Total Ordering rules
-	   if(multCheck == 1)
-	   {
-		   Iterator<TotalOrderInfo> iter = totalOrder.buffer.iterator();
-		   while(iter.hasNext())
-		   {
-			   TotalOrderInfo curr = iter.next();
-			   String toDeliver = curr.message;
-			   int src = processIdentifier(curr.port);
-			   
-			   if(curr.globalSequence == (this.totalOrder.localsequence + 1) )
-			   {
-				   this.totalOrder.localsequence++;
-				   System.out.println("Received \"" + toDeliver.trim() + "\"  from process " + src + ", system time is ­­­­­­­­­­­­­" + System.currentTimeMillis());
-			   }
-		   }
-	   }
-	   //Checks according to Causal Ordering Rules
-       else if(multCheck == 2)
+   //Collects client information and adds it to the client list
+   private int clientAdder(Socket server) throws UnknownHostException, IOException 
+   {
+	   String clientSockAdd = server.getRemoteSocketAddress().toString();
+	   
+       String[] clientInfo = clientSockAdd.split(":");
+       StringBuilder sb = new StringBuilder(clientInfo[0]);
+       sb.deleteCharAt(0);
+       
+       InetAddress clientIP = InetAddress.getByName(sb.toString());
+       int clientPort = Integer.parseInt(clientInfo[1]);
+       ProcessInfo client = new ProcessInfo(clientIP, clientPort);
+       
+       int clientId = clientIdentifier(clientPort);
+       if(clientId == -1)
        {
-    	   Iterator<CausalOrderInfo> iter = causalOrder.buffer.iterator();
-    	   
-    	   while(iter.hasNext())
-    	   {
-    		   CausalOrderInfo b = iter.next();
-    		   int mClock[] = causalOrder.strToArr(b.mClock);
-    		   int src = b.port;
-    		   int check = causalOrderCheck(mClock, src-1);
-    		   
-    		   if(check == 4)
-    		   {
-    			   causalOrder.clock[src-1] = mClock[src-1] ;
-    			   System.out.println("Received \"" + b.message.trim() + "\"  from process " + src + ", system time is ­­­­­­­­­­­­­" + System.currentTimeMillis());
-    			   iter.remove();
-    		   }
-    		  
-    		   
-    	   }
+    	   System.out.println("max Client = "+ maxClient);
+    	   clientId = maxClient;
+    	   clients.put(clientId, client);
+           maxClient++;
        }
-}
-
-//Delivers messages sent from the same port and buffers all messages from other sources
-private void causalOrderHandler(String[] cmd) {
-	   
-	   int src = processIdentifier(Integer.parseInt(cmd[cmd.length - 1]));
-	   int srcIndex = src - 1;
-	   
-	   String recMessage = "";	  
-	   for( int i = 0; i< cmd.length-3; i++)
-	   {
-		   recMessage = recMessage.concat(cmd[i] + " ");
-	   }
-	   
-	   //if command comes from the same port, then it increments clock and recieves otherwise it buffers
-	   if(serverSocket.getLocalPort() == src)
-	   {
-		   causalOrder.clock[srcIndex]++;
-		   System.out.println("Received \"" + recMessage.trim() + "\"  from process " + src + ", system time is ­­­­­­­­­­­­­" + System.currentTimeMillis());
-	   }
-	   else
-	   {
-		   causalOrder.buffer.add(new CausalOrderInfo(recMessage,cmd[cmd.length - 3],src));
-	   }
-}
-
-//Checks whether the message clock and the vector clock satisfy causality conditions
-private int causalOrderCheck(int[] mClock, int srcIndex) {
-		
-		int check = 0;
-		
-	   if(mClock[srcIndex] == (causalOrder.clock[srcIndex] + 1))
-		   check++;
-	   
-	   for(int i = 0; i< mClock.length; i++)
-	   {
-		   
-		   if( mClock[i] <= causalOrder.clock[i])
-		   {
-			   check++;
-		   }
-			   
-	   }
-	
-	   return check;
-}
-
-//adds messages to total order buffer (TOTAL ORDERING)
-private void multicast_recieve(String[] cmd) {
-	   String sentMessage = "";
-	   for( int i = 0; i< cmd.length-2; i++)
-	   {
-		   sentMessage = sentMessage.concat(cmd[i] + " ");
-	   }
-	   TotalOrderInfo curr = new TotalOrderInfo(sentMessage , globalSequence, Integer.parseInt(cmd[cmd.length - 1]));
-	   totalOrder.buffer.add(curr);
-}  
-
-   
-//handles msend commands based on the type of multicast
-private void multicastHandler(String[] cmd) 
-   {
-	   // Total Ordering
-	   if(this.multCheck == 1)
-	   {
-		   if(multicastLeader)
-		   {
-			   leaderSendHandler(cmd, serverSocket.getLocalPort());
-		   }
-		   else
-		   {
-			   //sends message to leader who then broadcasts it to everyone
-			   ProcessInfo destInfo = otherProcesses.get(1);
-			   String sendMessage = "";
-			  
-			   for( int i = 0; i< cmd.length-1; i++)
-			   {
-				   sendMessage = sendMessage.concat(cmd[i] + " ");
-			   }
-			   
-			   sendMessage = sendMessage.concat("msendproxy");
-			   
-			   Sender send = new Sender(1 , destInfo, sendMessage.trim(), min_delay, max_delay, serverSocket.getLocalPort());
-			   send.start();
-		   }
-	   }
-	   // Causal Ordering
-	   else if(this.multCheck == 2)
-	   {   
-		   int currId = processIdentifier(serverSocket.getLocalPort());
-		   causalOrder.clock[currId-1]++;
-		   
-		   for(int id = 0; id< otherProcesses.size(); id++)
-		   {
-			   ProcessInfo destInfo = otherProcesses.get(id+1);
-			   String sendMessage = "";
-			   
-			   for( int i = 1; i< cmd.length-1; i++)
-			   {	   
-				   sendMessage = sendMessage.concat(cmd[i] + " ");
-			   }
-			   sendMessage = sendMessage.concat(causalOrder.toString() + " causal ");
-			   
-			   Sender send = new Sender(id+1, destInfo, sendMessage.trim(), min_delay, max_delay, serverSocket.getLocalPort());
-			   send.start();
-			    
-		   }
-	   }
-	     	
+       
+       System.out.println("client size = "+ clients.size());
+       return clientId;
    }
-
-//Makes the leader thread send a multicast to all processes(TOTAL ORDERING)
-private void leaderSendHandler(String[] cmd, int sendPort) {
-	   
-		
-	   for(int id = 0; id< otherProcesses.size(); id++)
-	   {
-		   ProcessInfo destInfo = otherProcesses.get(id+1);
-		   
-		   String sendMessage = "";
-		   for( int i = 1; i< cmd.length-1; i++)
-		   {
-			   if(cmd[i].equals("msendproxy"))
-				continue;   
-			   sendMessage = sendMessage.concat(cmd[i] + " ");
-		   }
-		   sendMessage = sendMessage.concat("leader");
-		   
-		   Sender send = new Sender(id+1, destInfo, sendMessage.trim(), min_delay, max_delay, sendPort);
-		   send.start();
-		    
-	   }
-}
    
-
-   //spawns a sender thread for received 'send' commands
-   private void unicastHandler(String[] cmd) 
+   //Handles the 'put' command from the client and updates the output file.
+   private void putHandler(char[] cmd,int clientId)
    {
-	
-	   int dest = Integer.parseInt(cmd[1]);
-	   ProcessInfo destInfo = null;
-	   
-	   if(otherProcesses.containsKey(dest))
-	   {
-		   destInfo = otherProcesses.get(dest);
-		   String sendMessage = "";
-		   for(int i = 2; i< cmd.length - 1; i++)
-		   {
-
-			   sendMessage = sendMessage.concat(cmd[i] + " ");
-
-		   }
+	   try 
+	   { 
+		   //prepare put log info
+		   String logLine = "666,";
+		   String intId = Integer.toString(clientId);
+		   String variable = Character.toString(cmd[1]);
+		   String value = Character.toString(cmd[2]);
 		   
-		   Sender sender = new Sender(dest, destInfo, sendMessage.trim(), min_delay, max_delay, serverSocket.getLocalPort());
-		   sender.start();
-	   }
-	   else
+		   logLine = logLine.concat(intId+",put,"+variable+","+System.currentTimeMillis());
+		   String logLineReq = logLine.concat(",req,"+value+"\n");
+		   String logLineResp = logLine.concat(",resp,"+value+"\n");
+		   
+		   Writer output = new BufferedWriter(new FileWriter(outputFileName, true));
+		   output.append(logLineReq);
+		   output.close();
+		   
+		   Responder responder = new Responder(logLineResp, min_delay, max_delay, clients.get(clientId), outputFileName);
+		   responder.start();
+		   
+	   } 
+	   catch (IOException e) 
 	   {
-		   System.out.print("Destination process does not exist on network");
+		e.printStackTrace();
+	   }
+	   
+   }
+   
+   private void getHandler(char[] cmd, int clientId)
+   {
+	   try 
+	   { 
+		   //prepare put log info
+		   String logLine = "666,";
+		   String intId = Integer.toString(clientId);
+		   String variable = Character.toString(cmd[1]);
+		   
+		   logLine = logLine.concat(intId+",get,"+variable+","+ System.currentTimeMillis());
+		   String logLineReq = logLine.concat(",req"+"\n");
+		   
+		   Writer output = new BufferedWriter(new FileWriter(outputFileName, true));
+		   output.append(logLineReq);
+		   output.close();
+		   
+		   int value = findGetValue(variable);
+		   
+		   String logLineResp = logLine.concat(",resp,"+value+"\n");
+		   
+		   Responder responder = new Responder(logLineResp, min_delay, max_delay, clients.get(clientId), outputFileName);
+		   responder.start();
+		   
+	   } 
+	   catch (IOException e) 
+	   {
+		e.printStackTrace();
 	   }
    }
 
-   //delivers received messages
-   private void unicast_recieve(Socket server, String message) 
+   private int findGetValue(String variable) throws FileNotFoundException 
    {
-	    String[] cmd = message.split(" ");
-	    int sourcePort = Integer.parseInt(cmd[cmd.length - 1]);
-	    int src = processIdentifier(sourcePort);
-	    
-	    String recMessage = "";
- 	   	for(int i = 0; i< cmd.length - 1; i++)
- 	   	{
-
- 		   recMessage = recMessage.concat(cmd[i] + " ");
-
- 	   	}
-	   	
-	   	System.out.println("Received \"" + recMessage.trim() + "\"  from process " + src + ", system time is ­­­­­­­­­­­­­" + System.currentTimeMillis());
+	   int value = -1;
+	   @SuppressWarnings("resource")
+	   Scanner scanner = new Scanner(new File(outputFileName));
+	   
+	   while(scanner.hasNextLine())
+	   {
+		   String[] curr = scanner.nextLine().split(",");
+		   
+		   if(curr[2].equals("put") && curr[3].equals(variable))
+		   {
+			   value = Integer.parseInt(curr[6]);
+		   }
+	   }
+	   
+	   return value;
+   }
+   
+   private void dumpHandler(char[] cmd ,int clientId) throws FileNotFoundException
+   {
+	   @SuppressWarnings("resource")
+	   Scanner scanner = new Scanner(new File(outputFileName));
+	   
+	   while(scanner.hasNextLine())
+	   {
+		   System.out.println(scanner.nextLine());
+	   }
+	   
+	   Responder responder = new Responder("", min_delay, max_delay, clients.get(clientId), outputFileName);
+	   responder.start();
    }
 
   //returns the id of a process using it's port number
-  private int processIdentifier(int sourcePort) {
-	int src = 0;
-	for(Integer i : otherProcesses.keySet())
-	{
-		if(otherProcesses.get(i).getPort() == sourcePort)
+  private int processIdentifier(int sourcePort) 
+  {
+	  int src = 0;
+	  for(Integer i : replicas.keySet())
+	  {	
+		  if(replicas.get(i).getPort() == sourcePort)
+		  {
+			  src = i;
+			  break;
+		  }
+	  }
+	
+	  return src;
+  }
+  
+  //returns the ID of the client at the given port number
+  private int clientIdentifier(int sourcePort) 
+  {
+		int src = -1; 
+		
+		System.out.println("sourcePort = " + sourcePort);
+		for(Integer i : clients.keySet())
 		{
-			src = i;
-			break;
+			System.out.println("ID = "+ i);
+			if(clients.get(i).getPort() == sourcePort)
+			{
+				System.out.println("ports "+clients.get(i).getPort() );
+				src = i;
+				break;
+			}
 		}
-	}
-	return src;
+		
+		System.out.println("src =" + src);
+		return src;
   }
    
 
@@ -383,9 +281,6 @@ private void leaderSendHandler(String[] cmd, int sendPort) {
      	     }
         	
             receiver();
-            
-            
-            
             
          }catch(SocketTimeoutException s)
          {
@@ -411,13 +306,10 @@ private void leaderSendHandler(String[] cmd, int sendPort) {
          
          //starts the server
     	 Server reciever = new Server(port);
-         String fileName = args[2];
+         String fileName = args[1];
          File file = new File(fileName);
+         
          reciever.readConfig(file);
-         
-         //set multicast protocol
-    	 reciever.multCheck = Integer.parseInt(args[1]);  
-         
          reciever.start();
          
          //handles input from command line
