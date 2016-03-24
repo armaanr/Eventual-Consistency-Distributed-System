@@ -81,7 +81,6 @@ public class Server extends Thread
        DataInputStream in = new DataInputStream(server.getInputStream());
        String message = "";
        message = in.readUTF();   
-       message = "d";
        char[] cmd = message.toCharArray();
        char cmdType = cmd[0];
        
@@ -90,7 +89,6 @@ public class Server extends Thread
        if(cmdType == 'p')
        {
     	   putHandler(cmd, clientId);   
-    	  
        }
        else if(cmdType == 'g')
        {
@@ -121,7 +119,6 @@ public class Server extends Thread
        int clientId = clientIdentifier(clientPort);
        if(clientId == -1)
        {
-    	   System.out.println("max Client = "+ maxClient);
     	   clientId = maxClient;
     	   clients.put(clientId, client);
            maxClient++;
@@ -150,7 +147,7 @@ public class Server extends Thread
 		   output.append(logLineReq);
 		   output.close();
 		   
-		   Responder responder = new Responder(logLineResp, min_delay, max_delay, clients.get(clientId), outputFileName);
+		   Responder responder = new Responder(logLineResp, min_delay, max_delay, clients.get(clientId), outputFileName, 1);
 		   responder.start();
 		   
 	   } 
@@ -181,7 +178,7 @@ public class Server extends Thread
 		   
 		   String logLineResp = logLine.concat(",resp,"+value+"\n");
 		   
-		   Responder responder = new Responder(logLineResp, min_delay, max_delay, clients.get(clientId), outputFileName);
+		   Responder responder = new Responder(logLineResp, min_delay, max_delay, clients.get(clientId), outputFileName, 2);
 		   responder.start();
 		   
 	   } 
@@ -220,7 +217,7 @@ public class Server extends Thread
 		   System.out.println(scanner.nextLine());
 	   }
 	   
-	   Responder responder = new Responder("", min_delay, max_delay, clients.get(clientId), outputFileName);
+	   Responder responder = new Responder("", min_delay, max_delay, clients.get(clientId), outputFileName,3);
 	   responder.start();
    }
 
