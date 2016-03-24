@@ -14,14 +14,16 @@ public class Responder extends Thread {
 	public int min_delay;
 	public int max_delay;
 	public ProcessInfo clientInfo;
+	public int cmdType;
 	
-	public Responder(String msg, int min, int max, ProcessInfo info, String outFile)
+	public Responder(String msg, int min, int max, ProcessInfo info, String outFile, int ctype)
 	{
 		this.logLineResp = msg;
 		this.min_delay = min;
 		this.max_delay = max;
 		this.clientInfo = info;
 		this.outputFileName = outFile;
+		this.cmdType = ctype;
 	}
 	
 	//Opens a socket connection and sends a message to another process
@@ -92,26 +94,39 @@ public class Responder extends Thread {
 	}
 	  
 	public void run()
-	   {
+	{
 		 if (Thread.interrupted()) 
-	   	  	{
-		    	    try {
-						throw new InterruptedException();
-					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-		     } 
+	   	 {
+			 try 
+			 {
+				 throw new InterruptedException();
+			 } 
+			 catch (InterruptedException e) 
+			 {
+				 e.printStackTrace();
+			 }
+		  } 
 		 	
 		 	try {
 		 		delayGenerator();
-				putResponse();
+		 		
+		 		if(cmdType == 1)
+		 		{
+		 			putResponse();
+		 		}
+		 		else if(cmdType == 2)
+		 		{
+		 			getResponse();
+		 		}
+		 		else if(cmdType == 3)
+		 		{
+		 			dumpResponse();
+		 		}
+				
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-	        
-	         
 	         
 	      
 	   }
