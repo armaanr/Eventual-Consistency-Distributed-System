@@ -179,11 +179,11 @@ public class Server extends Thread
 		   
 		   if(value == -1)
 		   {
-			   logLineResp = logLine.concat(",resp,"+value+"\n");
+			   logLineResp = logLine.concat(",resp,NA\n");
 		   }
 		   else
 		   {
-			   logLineResp = logLine.concat(",resp,NA\n");
+			   logLineResp = logLine.concat(",resp,"+value+"\n");
 		   }
 		   
 		   Responder responder = new Responder(logLineResp, min_delay, max_delay, clients.get(clientId), outputFileName, 2);
