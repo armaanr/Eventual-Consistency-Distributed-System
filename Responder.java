@@ -51,7 +51,7 @@ public class Responder extends Thread {
 		Socket sendSock = new Socket(clientInfo.getIP(), clientInfo.getPort());	   
 		DataOutputStream out = new DataOutputStream(sendSock.getOutputStream());
 		String[] message = logLineResp.split(",");
-		out.write(Integer.parseInt(message[6]));
+		out.writeUTF(message[6]);
 		out.close();
 		
 		Writer output = new BufferedWriter(new FileWriter(outputFileName, true));
