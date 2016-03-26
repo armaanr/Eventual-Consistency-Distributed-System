@@ -175,8 +175,16 @@ public class Server extends Thread
 		   output.close();
 		   
 		   int value = findGetValue(variable);
+		   String logLineResp = "";
 		   
-		   String logLineResp = logLine.concat(",resp,"+value+"\n");
+		   if(value == -1)
+		   {
+			   logLineResp = logLine.concat(",resp,"+value+"\n");
+		   }
+		   else
+		   {
+			   logLineResp = logLine.concat(",resp,NA\n");
+		   }
 		   
 		   Responder responder = new Responder(logLineResp, min_delay, max_delay, clients.get(clientId), outputFileName, 2);
 		   responder.start();
