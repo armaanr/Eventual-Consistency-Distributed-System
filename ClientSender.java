@@ -9,6 +9,7 @@ public class ClientSender implements Runnable
 {
     public String cmd;
     public Client client;
+    public boolean should_send;
 
     /*
      * Creates a runnable class that makes a new thread
@@ -25,15 +26,15 @@ public class ClientSender implements Runnable
      */
     private void send_cmd() throws IOException 
     {
-		InetAddress destIp = this.client.replica_ip;
-		int destPort = this.client.replica_port;
-		   
-		Socket sendSock = new Socket(destIp, destPort);	   
-		DataOutputStream out = new DataOutputStream(sendSock.getOutputStream());
-		
-		out.writeUTF(this.cmd);
-		
-		sendSock.close();
+        InetAddress destIp = this.client.replica_ip;
+        int destPort = this.client.replica_port;
+           
+        Socket sendSock = new Socket(destIp, destPort);	   
+        DataOutputStream out = new DataOutputStream(sendSock.getOutputStream());
+        
+        out.writeUTF(this.cmd +  " " + this.client.receiving_port);
+        
+        sendSock.close();
     }
 
     /*

@@ -4,8 +4,6 @@ import java.io.*;
 
 public class Client extends Thread
 {
-    public int id;
-
     // Information from configuration file.
     public int min_delay;
     public int max_delay;
@@ -25,11 +23,20 @@ public class Client extends Thread
      * The rest of the fields are filled in by the configuration
      * file parser.
      */
-    public Client(int client_id, int server_id)
+    public Client(int client_port, int server_id)
     {
-        this.id = client_id;
-        this.server_id = server_id;
-        this.otherProcesses = new HashMap<Integer, ProcessInfo>();
+        try
+        {
+            this.receiving_port = client_port;
+            this.receiving_socket = new ServerSocket(client_port, 10);
+            this.receiving_socket.setSoTimeout(150000);
+            this.server_id = server_id;
+            this.otherProcesses = new HashMap<Integer, ProcessInfo>();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
     }
 
     /* 
@@ -120,13 +127,7 @@ public class Client extends Thread
 
             InetAddress ip = InetAddress.getByName(tokens[1]);
             int port = Integer.parseInt(tokens[2]); 
-            if (id == this.id)
-            {
-                this.receiving_port = port;
-                this.receiving_socket = new ServerSocket(port);
-                this.receiving_socket.setSoTimeout(150000);
-            }
-            else if (id == this.server_id)
+            if (id == this.server_id)
             {
                 this.replica_port = port;
                 this.replica_ip = ip;
@@ -149,9 +150,9 @@ public class Client extends Thread
         try
         {
             // Gets client's id and server's id from command line args.
-            int client_id = Integer.parseInt(args[0]);
+            int client_port = Integer.parseInt(args[0]);
             int server_id = Integer.parseInt(args[1]);
-            Client client = new Client(client_id, server_id);
+            Client client = new Client(client_port, server_id);
 
             // Parses config file get information about all nodes.
             String fileName = args[2];
