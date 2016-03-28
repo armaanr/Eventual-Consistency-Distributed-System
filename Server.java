@@ -56,8 +56,7 @@ public class Server extends Thread
 	    int currProcess = processIdentifier(this.serverSocket.getLocalPort());
 	    String processName = Integer.toString(currProcess).concat(".txt"); 
 	   	this.outputFileName = this.outputFileName.concat(processName);
-	   
-	   	System.out.println(outputFileName);
+	   	
 	    
    }
    
@@ -69,21 +68,25 @@ public class Server extends Thread
 	   
 	   System.out.println("Waiting for client on port " + serverSocket.getLocalPort() + "...");
        Socket server = this.serverSocket.accept();
-       int clientId = -1;
+       System.out.println(server.getLocalSocketAddress());
        
-       System.out.println(server.getRemoteSocketAddress());
        
-       clientId = clientAdder(server);
-       
-       System.out.println("clientId = " + clientId);
        
        //receives message
        DataInputStream in = new DataInputStream(server.getInputStream());
        String message = "";
-       message = in.readUTF();   
-       char[] cmd = message.toCharArray();
-       char cmdType = cmd[0];
+       message = in.readUTF();  
        
+       System.out.println(server.getRemoteSocketAddress());
+       System.out.println("message rcvd => ("+ message+")");
+       
+       String[] clientMessage = message.split(" ");
+       
+       int clientId = -1;
+       clientId = clientAdder(server, Integer.parseInt(clientMessage[1]));
+       
+       char[] cmd = clientMessage[0].toCharArray();
+       char cmdType = cmd[0];
        
        //handles 'send' commands from command line
        if(cmdType == 'p')
@@ -104,7 +107,7 @@ public class Server extends Thread
    }
 
    //Collects client information and adds it to the client list
-   private int clientAdder(Socket server) throws UnknownHostException, IOException 
+   private int clientAdder(Socket server, int cliPort) throws UnknownHostException, IOException 
    {
 	   String clientSockAdd = server.getRemoteSocketAddress().toString();
 	   
@@ -113,7 +116,7 @@ public class Server extends Thread
        sb.deleteCharAt(0);
        
        InetAddress clientIP = InetAddress.getByName(sb.toString());
-       int clientPort = Integer.parseInt(clientInfo[1]);
+       int clientPort = cliPort;
        ProcessInfo client = new ProcessInfo(clientIP, clientPort);
        
        int clientId = clientIdentifier(clientPort);
@@ -123,6 +126,7 @@ public class Server extends Thread
     	   clients.put(clientId, client);
            maxClient++;
        }
+	   	
        
        System.out.println("client size = "+ clients.size());
        return clientId;
@@ -250,19 +254,15 @@ public class Server extends Thread
   {
 		int src = -1; 
 		
-		System.out.println("sourcePort = " + sourcePort);
 		for(Integer i : clients.keySet())
 		{
-			System.out.println("ID = "+ i);
 			if(clients.get(i).getPort() == sourcePort)
 			{
-				System.out.println("ports "+clients.get(i).getPort() );
 				src = i;
 				break;
 			}
 		}
 		
-		System.out.println("src =" + src);
 		return src;
   }
    
@@ -274,14 +274,18 @@ public class Server extends Thread
       {
          try
          {	 
-        	
-        	if (Thread.interrupted()) 
+        	System.out.println(Thread.currentThread().isInterrupted());
+        	if (Thread.currentThread().isInterrupted()) 
         	{
-        		try {
+        		try 
+        		{
+        			System.out.println("lololololol123");
      				throw new InterruptedException();
-     			} catch (InterruptedException e) {
-     					// TODO Auto-generated catch block
-     					e.printStackTrace();
+     			} 
+        		catch (InterruptedException e) 
+        		{
+     				System.out.println("lololololol");
+     				e.printStackTrace();
      			}
      	     }
         	
@@ -313,17 +317,20 @@ public class Server extends Thread
     	 Server reciever = new Server(port);
          String fileName = args[1];
          File file = new File(fileName);
-         
          reciever.readConfig(file);
+         
          reciever.start();
          
-         //handles input from command line
-         InetAddress add = reciever.serverSocket.getInetAddress(); 
-         CommandTaker listen = new CommandTaker(add, port);
          
-         listen.start();
+         
+         
+         //handles input from command line
+         //InetAddress add = reciever.serverSocket.getInetAddress(); 
+         //CommandTaker listen = new CommandTaker(add, port);
+         //listen.start();
        
-      }catch(IOException e)
+      }
+      catch(IOException e)
       {
          e.printStackTrace();
       }
