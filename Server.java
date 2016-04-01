@@ -8,12 +8,18 @@ public class Server extends Thread
    public ServerSocket serverSocket;
    
    //contains the information about all processes
+   public int id;
    public Map<Integer, ProcessInfo> replicas;
    public Map<Integer, ProcessInfo> clients;
    public int maxClient;
    public String outputFileName;
    public int min_delay;
    public int max_delay;
+   
+   //for linearizability
+   public TotalOrderMulticast linearizability;
+   public boolean sequencer;
+   public int globalSequence;
    
    public Server(int port) throws IOException
    {
@@ -22,6 +28,12 @@ public class Server extends Thread
       this.clients = new HashMap<Integer, ProcessInfo>();
       this.outputFileName = "outputs/output_log";
       this.maxClient = 0;
+      this.min_delay= 0;
+      this.max_delay = 0;
+      
+      this.linearizability = new TotalOrderMulticast();
+      this.sequencer =  false;
+      this.globalSequence = 0;
    }
    
    //Parses the given config file to initialize the Server variables
@@ -53,14 +65,17 @@ public class Server extends Thread
 	    }
 	   
 	    //sets the name of the output file
-	    int currProcess = processIdentifier(this.serverSocket.getLocalPort());
-	    String processName = Integer.toString(currProcess).concat(".txt"); 
+	    this.id = processIdentifier(this.serverSocket.getLocalPort());
+	    String processName = Integer.toString(this.id).concat(".txt"); 
 	   	this.outputFileName = this.outputFileName.concat(processName);
+	   	
+	   	if(this.id == 1)
+	   	{
+	   		this.sequencer = true;
+	   	}
 	   	
 	    
    }
-   
-   
 
    //parses received messages and accordingly allocates tasks
    public void receiver() throws IOException
@@ -69,8 +84,6 @@ public class Server extends Thread
 	   System.out.println("Waiting for client on port " + serverSocket.getLocalPort() + "...");
        Socket server = this.serverSocket.accept();
        System.out.println(server.getLocalSocketAddress());
-       
-       
        
        //receives message
        DataInputStream in = new DataInputStream(server.getInputStream());
@@ -82,24 +95,54 @@ public class Server extends Thread
        
        String[] clientMessage = message.split(" ");
        
-       int clientId = -1;
-       clientId = clientAdder(server, Integer.parseInt(clientMessage[1]));
-       
-       char[] cmd = clientMessage[0].toCharArray();
-       char cmdType = cmd[0];
-       
-       //handles 'send' commands from command line
-       if(cmdType == 'p')
+       if(clientMessage[0].equals("TO"))
        {
-    	   putHandler(cmd, clientId);   
+    	   System.out.println("checking TO messages");
+    	   
+    	   String currMsg = clientMessage[2];
+    	   int currId = Integer.parseInt(clientMessage[3]);
+    	   int currgs = Integer.parseInt(clientMessage[4]);
+    	   TotalOrderMulticast.TotalOrderInfo curr = linearizability.new TotalOrderInfo(currMsg, currId, currgs);
+    	   
+    	   if(clientMessage[1].equals("M"))
+    	   {
+    		   if(linearizability.seqBuffer.contains(curr))
+    		   {
+    			   int currIndex = linearizability.seqBuffer.indexOf(curr);
+    			   
+    			   if(linearizability.seqBuffer.get(currIndex).currGlobalSeq == (linearizability.localSequence+1) )
+    			   {
+    				   System.out.println("found message in SeqBuffer");
+    			   }
+    				   
+    		   }
+    		   else
+    		   {
+    			   linearizability.recMessages.add(curr);
+    		   }
+    	   }
+
        }
-       else if(cmdType == 'g')
+       else
        {
-    	   getHandler(cmd, clientId); 
-       }
-       else if(cmdType == 'd')
-       {
-    	   dumpHandler(cmd, clientId); 
+    	   char[] cmd = clientMessage[0].toCharArray();
+           char cmdType = cmd[0];
+       	   int clientId = -1;
+	       clientId = clientAdder(server, Integer.parseInt(clientMessage[1]));
+	       
+	       //handles 'send' commands from command line
+	       if(cmdType == 'p')
+	       {
+	    	   putHandler(cmd, clientId);   
+	       }
+	       else if(cmdType == 'g')
+	       {
+	    	   getHandler(cmd, clientId); 
+	       }
+	       else if(cmdType == 'd')
+	       {
+	    	   dumpHandler(cmd, clientId); 
+	       }
        }
        
        server.close();
@@ -143,6 +186,8 @@ public class Server extends Thread
 		   String variable = Character.toString(cmd[1]);
 		   String value = Character.toString(cmd[2]);
 		   
+		   
+		   
 		   logLine = logLine.concat(intId+",put,"+variable+","+System.currentTimeMillis());
 		   String logLineReq = logLine.concat(",req,"+value+"\n");
 		   String logLineResp = logLine.concat(",resp,"+value+"\n");
@@ -151,6 +196,12 @@ public class Server extends Thread
 		   output.append(logLineReq);
 		   output.close();
 		   
+		   //multicast 
+		   
+		  String msg = new String(cmd);
+		  broadcaster(msg);
+		  
+		   //responds to the client
 		   Responder responder = new Responder(logLineResp, min_delay, max_delay, clients.get(clientId), outputFileName, 1);
 		   responder.start();
 		   
@@ -177,6 +228,9 @@ public class Server extends Thread
 		   Writer output = new BufferedWriter(new FileWriter(outputFileName, true));
 		   output.append(logLineReq);
 		   output.close();
+		   
+		   String msg = new String(cmd);
+		   broadcaster(msg);
 		   
 		   int value = findGetValue(variable);
 		   String logLineResp = "";
@@ -232,6 +286,29 @@ public class Server extends Thread
 	   Responder responder = new Responder("", min_delay, max_delay, clients.get(clientId), outputFileName,3);
 	   responder.start();
    }
+   
+   private void broadcaster(String msg) throws IOException 
+   {
+		  
+	   for(Integer i : replicas.keySet())
+	   {
+		   try
+		   {
+			   Socket sendSock = new Socket();
+			   ProcessInfo toSend = replicas.get(i);
+			   sendSock.connect(new InetSocketAddress(toSend.getIP(), toSend.getPort())); 
+		       DataOutputStream out = new DataOutputStream(sendSock.getOutputStream());
+		       out.writeUTF("TO "+"M "+msg+" "+ Integer.toString(this.id)+" "+ Integer.toString(-1));
+		       sendSock.close();
+			}
+			catch(SocketException s)
+			{
+				continue;
+			}
+	   	}
+	
+	}
+	   
 
   //returns the id of a process using it's port number
   private int processIdentifier(int sourcePort) 
@@ -274,20 +351,6 @@ public class Server extends Thread
       {
          try
          {	 
-        	System.out.println(Thread.currentThread().isInterrupted());
-        	if (Thread.currentThread().isInterrupted()) 
-        	{
-        		try 
-        		{
-        			System.out.println("lololololol123");
-     				throw new InterruptedException();
-     			} 
-        		catch (InterruptedException e) 
-        		{
-     				System.out.println("lololololol");
-     				e.printStackTrace();
-     			}
-     	     }
         	
             receiver();
             
@@ -311,7 +374,6 @@ public class Server extends Thread
       try
       {
     	 int port = Integer.parseInt(args[0]);
-    	  
          
          //starts the server
     	 Server reciever = new Server(port);
@@ -320,14 +382,6 @@ public class Server extends Thread
          reciever.readConfig(file);
          
          reciever.start();
-         
-         
-         
-         
-         //handles input from command line
-         //InetAddress add = reciever.serverSocket.getInetAddress(); 
-         //CommandTaker listen = new CommandTaker(add, port);
-         //listen.start();
        
       }
       catch(IOException e)
