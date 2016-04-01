@@ -1,6 +1,9 @@
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.io.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Client extends Thread
 {
@@ -12,11 +15,32 @@ public class Client extends Thread
     // For receiving acknowledgements.
     public int receiving_port;
     public ServerSocket receiving_socket;
+    boolean need_ack;
 
     // For sending commands to the replica.
     public int server_id;
     public int replica_port;
     public InetAddress replica_ip;
+    // Stores commands until they can be sent to the replica.
+    public Queue<String> Q;
+
+    public Lock mutex;
+
+    /*
+     * If this client's replica crashes, it must connect to the replica
+     * with the next higher id. reset() takes care of this and resends
+     * the last message sent to the crashed replica.
+     */
+    public void reset(String cmd)
+    {
+        Runnable sender;
+
+        this.server_id = (this.server_id + 1) % this.otherProcesses.size();
+        this.replica_port = this.otherProcesses.get(server_id).getPort();
+        this.replica_ip = this.otherProcesses.get(server_id).getIP();
+        sender = new ClientSender(this, cmd);
+        new Thread(sender).start();
+    }
 
     /*
      * Client constructor fills in basic fields from command line.
@@ -32,6 +56,9 @@ public class Client extends Thread
             this.receiving_socket.setSoTimeout(150000);
             this.server_id = server_id;
             this.otherProcesses = new HashMap<Integer, ProcessInfo>();
+            this.Q = new ConcurrentLinkedQueue<String>();
+            this.need_ack = false;
+            this.mutex = new ReentrantLock(true);
         }
         catch (IOException e)
         {
@@ -56,20 +83,40 @@ public class Client extends Thread
         if(tokens[0].equals("put") && (tokens.length >= 3))
         {		    	 
             cmd = tokens[0].substring(0,1) + tokens[1].substring(0,1) + tokens[2];
-            sender = new ClientSender(this, cmd);
-            new Thread(sender).start();
+            this.mutex.lock();
+            if (!this.need_ack) {
+                sender = new ClientSender(this, cmd);
+                new Thread(sender).start();
+            }
+            else
+                this.Q.add(cmd);
+                this.need_ack = true;
+            this.mutex.unlock();
         }
         else if(tokens[0].equals("get") && (tokens.length >= 2))
         {
             cmd = tokens[0].substring(0,1) + tokens[1].substring(0,1);
-            sender = new ClientSender(this, cmd);
-            new Thread(sender).start();
+            this.mutex.lock();
+            if (!this.need_ack) {
+                sender = new ClientSender(this, cmd);
+                new Thread(sender).start();
+            }
+            else
+                this.Q.add(cmd);
+                this.need_ack = true;
+            this.mutex.unlock();
         }
         else if(tokens[0].equals("dump"))
         {
             cmd = tokens[0].substring(0,1);
-            sender = new ClientSender(this, cmd);
-            new Thread(sender).start();
+            this.mutex.lock();
+            if (!this.need_ack) {
+                sender = new ClientSender(this, cmd);
+                new Thread(sender).start();
+            }
+            else
+                this.Q.add(cmd);
+            this.mutex.unlock();
         }
         else if(tokens[0].equals("delay") && (tokens.length >= 2))
         {
@@ -203,13 +250,27 @@ public class Client extends Thread
     public void receive_ack() throws IOException
     {
         Socket receiver = this.receiving_socket.accept();
+        Runnable sender;
+        String cmd;
 
         // Receives message.
         DataInputStream in = new DataInputStream(receiver.getInputStream());
         String ack = "";
         ack = in.readUTF();
 
-        // TODO: Handle ack's
+        // Sends the next message in Q since the ack from the previous was
+        // received. If there is no message to be sent, then nothing happens
+        // and need_ack remains false.
+        this.mutex.lock();
+        this.need_ack = false;
+        if (!this.Q.isEmpty()) {
+            cmd = this.Q.poll();
+            sender = new ClientSender(this, cmd);
+            new Thread(sender).start();
+            this.need_ack = true;
+        }
+        this.mutex.unlock();
+
         System.out.println(ack);
 
         receiver.close();

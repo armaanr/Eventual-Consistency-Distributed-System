@@ -9,7 +9,6 @@ public class ClientSender implements Runnable
 {
     public String cmd;
     public Client client;
-    public boolean should_send;
 
     /*
      * Creates a runnable class that makes a new thread
@@ -53,8 +52,9 @@ public class ClientSender implements Runnable
             }
             send_cmd();
         }
-        catch (SocketTimeoutException s) {
-             System.out.println("Socket timed out!");
+        catch (ConnectException c) {
+            System.out.println("Switching to server with next higher id.");
+            this.client.reset(cmd);
         }
         catch (IOException e) {
              e.printStackTrace();
