@@ -25,6 +25,7 @@ public class ClientSender implements Runnable
      */
     private void send_cmd() throws IOException 
     {
+        this.client.last_sent = System.currentTimeMillis();
         InetAddress destIp = this.client.replica_ip;
         int destPort = this.client.replica_port;
            

@@ -338,6 +338,7 @@ public class ServerEC extends Thread
            this.mutex2.unlock();
 		   
 		   // Multicast message to all other replicas. 
+           // The -1 fields don't matter in this context.
 		   String msg = "EC "
                         +"M "
                         +cmd[0] +cmd[1] + " "
@@ -416,8 +417,6 @@ public class ServerEC extends Thread
 		
 		return src;
   }
-   
-
    
    public void run()
    {

@@ -26,6 +26,9 @@ public class Client extends Thread
 
     public Lock mutex;
 
+    // For handling timeouts.
+    public long last_sent;
+
     /*
      * If this client's replica crashes, it must connect to the replica
      * with the next higher id. reset() takes care of this and resends
@@ -33,13 +36,20 @@ public class Client extends Thread
      */
     public void reset(String cmd)
     {
+        System.out.println("Switching to server with next higher id.");
         Runnable sender;
 
-        this.server_id = (this.server_id + 1) % this.otherProcesses.size();
+        this.server_id = ((this.server_id+1) % this.otherProcesses.size());
+        if (this.server_id == 0)
+            this.server_id++;
         this.replica_port = this.otherProcesses.get(server_id).getPort();
         this.replica_ip = this.otherProcesses.get(server_id).getIP();
-        sender = new ClientSender(this, cmd);
-        new Thread(sender).start();
+        // Send the command to the new replica if it should be resent.
+        if (!cmd.equals("drop"))
+        {
+            sender = new ClientSender(this, cmd);
+            new Thread(sender).start();
+        }
     }
 
     /*
@@ -53,7 +63,7 @@ public class Client extends Thread
         {
             this.receiving_port = client_port;
             this.receiving_socket = new ServerSocket(client_port, 10);
-            this.receiving_socket.setSoTimeout(150000);
+            this.receiving_socket.setSoTimeout(this.max_delay*2+1);
             this.server_id = server_id;
             this.otherProcesses = new HashMap<Integer, ProcessInfo>();
             this.Q = new ConcurrentLinkedQueue<String>();
@@ -291,8 +301,13 @@ public class Client extends Thread
                 receive_ack();
             }
             catch (SocketTimeoutException s) {
-                System.out.println("Socket timed out!");
-                break;
+                if (this.need_ack && (System.currentTimeMillis() - this.max_delay*2) > this.last_sent)
+                {
+                    this.need_ack = false;
+                    this.reset("drop");
+                    System.out.println("No ack received");
+                }
+//                break;
             }
             catch (IOException e) {
                 e.printStackTrace();
