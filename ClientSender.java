@@ -54,7 +54,6 @@ public class ClientSender implements Runnable
             send_cmd();
         }
         catch (ConnectException c) {
-            System.out.println("Switching to server with next higher id.");
             this.client.reset(cmd);
         }
         catch (IOException e) {

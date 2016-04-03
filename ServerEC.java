@@ -235,6 +235,14 @@ public class ServerEC extends Thread
 		   output.append(logLineReq);
 		   output.close();
 
+//           // For sending to the visualization tool.
+//            InetAddress dstip = InetAddress.getByName("127.0.0.1");
+//            Socket sendSock = new Socket();
+//            sendSock.connect(new InetSocketAddress(dstip, 1234)); 
+//            DataOutputStream out = new DataOutputStream(sendSock.getOutputStream());
+//            out.writeUTF(logLineReq);
+//            sendSock.close();
+
 		   // Multicast message to all other replicas. 
 		   String msg = "EC "
                         +"M "
@@ -325,6 +333,14 @@ public class ServerEC extends Thread
 		   Writer output = new BufferedWriter(new FileWriter(outputFileName, true));
 		   output.append(logLineReq);
 		   output.close();
+
+//           // For sending to the visualization tool.
+//            InetAddress dstip = InetAddress.getByName("127.0.0.1");
+//            Socket sendSock = new Socket();
+//            sendSock.connect(new InetSocketAddress(dstip, 1234)); 
+//            DataOutputStream out = new DataOutputStream(sendSock.getOutputStream());
+//            out.writeUTF(logLineReq);
+//            sendSock.close();
 
            // Sets up the message table so we know how many responses to wait for.
            this.mutex.lock();

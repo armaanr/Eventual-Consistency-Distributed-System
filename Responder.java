@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.net.*;
 import java.util.Random;
 
 public class Responder extends Thread {
@@ -38,6 +39,14 @@ public class Responder extends Thread {
 		Writer output = new BufferedWriter(new FileWriter(outputFileName, true));
 		output.append(logLineResp);
 		output.close();
+
+//           // For sending to the visualization tool.
+//            InetAddress ip = InetAddress.getByName("127.0.0.1");
+//            Socket sendSock2 = new Socket();
+//            sendSock2.connect(new InetSocketAddress(ip, 1234)); 
+//            DataOutputStream outstream = new DataOutputStream(sendSock2.getOutputStream());
+//            outstream.writeUTF(logLineResp);
+//            sendSock2.close();
 		
 		sendSock.close();
 		  
