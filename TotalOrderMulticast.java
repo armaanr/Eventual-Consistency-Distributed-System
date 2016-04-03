@@ -40,6 +40,32 @@ public class TotalOrderMulticast {
 		return null;
 	}
 	
+	public int messagesCheck(String msg)
+	{
+		for(TotalOrderInfo curr : recMessages )
+		{
+			if(curr.message.equals(msg))
+			{
+				return recMessages.indexOf(curr);
+			}
+		}
+		
+		return -1;
+	}
+	
+	public int sequencerCheck(String msg, int ls)
+	{
+		for(TotalOrderInfo curr : seqBuffer )
+		{
+			if(curr.message.equals(msg) && (curr.currGlobalSeq == ls+1) )
+			{
+				return seqBuffer.indexOf(curr);
+			}
+		}
+		
+		return -1;
+	}
+	
 	
 
 }

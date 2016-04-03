@@ -106,19 +106,43 @@ public class Server extends Thread
     	   
     	   if(clientMessage[1].equals("M"))
     	   {
-    		   if(linearizability.seqBuffer.contains(curr))
+    		   int seqIndex = linearizability.sequencerCheck(currMsg, linearizability.localSequence);
+    		   
+    		   if(seqIndex != -1)
     		   {
-    			   int currIndex = linearizability.seqBuffer.indexOf(curr);
-    			   
-    			   if(linearizability.seqBuffer.get(currIndex).currGlobalSeq == (linearizability.localSequence+1) )
-    			   {
-    				   System.out.println("found message in SeqBuffer");
-    			   }
-    				   
+    			   linearizability.localSequence++;
+    			   TotalOrderMulticast.TotalOrderInfo update = linearizability.seqBuffer.remove(seqIndex);
+    			   System.out.println("removed from seqBuffer");
+  
     		   }
     		   else
     		   {
+    			   System.out.println("added to recMessages");
     			   linearizability.recMessages.add(curr);
+    		   }
+    		   
+    		   if(sequencer)
+    		   {
+    			   globalSequence++;
+    			   broadcaster(curr.message, true);
+    		   }
+    	   }
+    	   
+    	   if(clientMessage[1].equals("S"))
+    	   {
+    		   int recIndex = linearizability.messagesCheck(currMsg);
+    		  
+    		   if(recIndex != -1)
+    		   {
+    			   TotalOrderMulticast.TotalOrderInfo update = linearizability.recMessages.remove(recIndex);   
+    			   System.out.println("removed from recMessages");
+    			   System.out.println("recMessages size =>" + linearizability.recMessages.size());
+    		   }
+    		   else
+    		   {
+    			   System.out.println("added to seqBuffer");
+    			   System.out.println("recMessages size =>" + linearizability.recMessages.size());
+    			   linearizability.seqBuffer.add(curr);
     		   }
     	   }
 
@@ -197,9 +221,9 @@ public class Server extends Thread
 		   output.close();
 		   
 		   //multicast 
-		   
+		
 		  String msg = new String(cmd);
-		  broadcaster(msg);
+		  broadcaster(msg,false);
 		  
 		   //responds to the client
 		   Responder responder = new Responder(logLineResp, min_delay, max_delay, clients.get(clientId), outputFileName, 1);
@@ -230,7 +254,7 @@ public class Server extends Thread
 		   output.close();
 		   
 		   String msg = new String(cmd);
-		   broadcaster(msg);
+		   broadcaster(msg, false);
 		   
 		   int value = findGetValue(variable);
 		   String logLineResp = "";
@@ -287,7 +311,7 @@ public class Server extends Thread
 	   responder.start();
    }
    
-   private void broadcaster(String msg) throws IOException 
+   private void broadcaster(String msg, boolean seq) throws IOException 
    {
 		  
 	   for(Integer i : replicas.keySet())
@@ -298,7 +322,15 @@ public class Server extends Thread
 			   ProcessInfo toSend = replicas.get(i);
 			   sendSock.connect(new InetSocketAddress(toSend.getIP(), toSend.getPort())); 
 		       DataOutputStream out = new DataOutputStream(sendSock.getOutputStream());
-		       out.writeUTF("TO "+"M "+msg+" "+ Integer.toString(this.id)+" "+ Integer.toString(-1));
+		       if(seq)
+		       {
+		    	   out.writeUTF("TO "+"S "+msg+" "+ Integer.toString(this.id)+" "+ Integer.toString(globalSequence));
+		       }
+		       else
+		       {
+		    	   out.writeUTF("TO "+"M "+msg+" "+ Integer.toString(this.id)+" "+ Integer.toString(-1));
+		       }
+		       
 		       sendSock.close();
 			}
 			catch(SocketException s)
