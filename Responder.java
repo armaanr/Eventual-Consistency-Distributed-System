@@ -11,9 +11,9 @@ public class Responder extends Thread {
 	
 	public String logLineResp;
 	public String outputFileName;
-	public int min_delay;
-	public int max_delay;
 	public ProcessInfo clientInfo;
+    public int min_delay;
+    public int max_delay;
 	public int cmdType;
 	
 	public Responder(String msg, int min, int max, ProcessInfo info, String outFile, int ctype)
@@ -108,8 +108,6 @@ public class Responder extends Thread {
 		  } 
 		 	
 		 	try {
-		 		delayGenerator();
-		 		
 		 		if(cmdType == 1)
 		 		{
 		 			putResponse();
@@ -127,10 +125,5 @@ public class Responder extends Thread {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-	         
-	      
 	   }
-
-	
-
 }
