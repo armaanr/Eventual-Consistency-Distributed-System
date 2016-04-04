@@ -129,7 +129,7 @@ public class ServerLinear extends Thread
     		   if(sequencer)
     		   {
     			   globalSequence++;
-    			   broadcaster(curr.message, true, clientId, logLine);
+    			   broadcaster(curr.message, true, clientId, logLine, currId);
     		   }
     	   }
     	   
@@ -265,7 +265,7 @@ public class ServerLinear extends Thread
 		   
 		   //multicast 
 		   String msg = new String(cmd);
-		   broadcaster(msg,false,clientId,logLine);
+		   broadcaster(msg,false,clientId,logLine,-1);
 		   
 	   } 
 	   catch (IOException e) 
@@ -292,7 +292,7 @@ public class ServerLinear extends Thread
 		   output.close();
 		   
 		   String msg = new String(cmd);
-		   broadcaster(msg, false, clientId, logLine);
+		   broadcaster(msg, false, clientId, logLine,-1);
 		   
 	   } 
 	   catch (IOException e) 
@@ -315,7 +315,7 @@ public class ServerLinear extends Thread
 	   responderLinear.start();
    }
    
-   private void broadcaster(String msg, boolean seq, int clientId, String logLine) throws IOException 
+   private void broadcaster(String msg, boolean seq, int clientId, String logLine, int origServerId) throws IOException 
    {
 		  
 	   for(Integer i : replicas.keySet())
@@ -326,7 +326,7 @@ public class ServerLinear extends Thread
 		  
 	       if(seq)
 	       {
-	    	   sendMessage = "TO "+"S "+msg+" "+ Integer.toString(this.id)+" "+ Integer.toString(globalSequence)+" "+clientId+" "+logLine;
+	    	   sendMessage = "TO "+"S "+msg+" "+ Integer.toString(origServerId)+" "+ Integer.toString(globalSequence)+" "+clientId+" "+logLine;
 	       }
 	       else
 	       {
