@@ -99,88 +99,104 @@ public class ServerLinear extends Thread
        
        if(clientMessage[0].equals("TO"))
        {
-    	   System.out.println("checking TO messages");
-    	   
-    	   String currMsg = clientMessage[2];
-    	   int origId = Integer.parseInt(clientMessage[3]);
-    	   int currgs = Integer.parseInt(clientMessage[4]);
-    	   int clientId = Integer.parseInt(clientMessage[5]);
-    	   String logLine = clientMessage[6];
-    	   TotalOrderMulticast.TotalOrderInfo curr = linearizability.new TotalOrderInfo(currMsg, currgs, origId);
-    	   
-    	   if(clientMessage[1].equals("M"))
-    	   {
-    		   int seqIndex = linearizability.sequencerCheck(currMsg, origId, linearizability.localSequence);
-    		   
-    		   if(seqIndex != -1)
-    		   {
-    			   linearizability.localSequence++;
-    			   TotalOrderMulticast.TotalOrderInfo update = linearizability.seqBuffer.remove(seqIndex);
-    			   System.out.println("message=> "+update.message+" Id => "+update.id+" global=> "+update.currGlobalSeq );
-    			   System.out.println("seqBuffer size =>" + linearizability.seqBuffer.size()+"\n");
-    			   respond(clientId, logLine, update, origId);
-    		   }
-    		   else
-    		   {
-    			   System.out.println("added to recMessages\n");
-    			   linearizability.recMessages.add(curr);
-    		   }
-    		   
-    		   if(sequencer)
-    		   {
-    			   globalSequence++;
-    			   broadcaster(curr.message, true, clientId, logLine, origId);
-    		   }
-    	   }
-    	   
-    	   if(clientMessage[1].equals("S"))
-    	   {
-    		   int recIndex = linearizability.messagesCheck(currMsg, origId);
-    		  
-    		   if(recIndex != -1)
-    		   {
-    			   TotalOrderMulticast.TotalOrderInfo update = linearizability.recMessages.remove(recIndex); 
-    			   System.out.println("message=> "+update.message+" Id => "+update.id+" global=> "+update.currGlobalSeq );
-    			   System.out.println("recMessages size =>" + linearizability.recMessages.size()+"\n");
-    			   
-    			   respond(clientId, logLine, update, origId);
-    			   
-    		   }
-    		   else
-    		   {
-    			   System.out.println("added to seqBuffer");
-    			   System.out.println("recMessages size =>" + linearizability.recMessages.size()+"\n");
-    			   linearizability.seqBuffer.add(curr);
-    		   }
-    	   }
+    	   totalOrderHandler(clientMessage);
 
        }
        else
        {
-    	   char[] cmd = clientMessage[0].toCharArray();
-           char cmdType = cmd[0];
-       	   int clientId = -1;
-	       clientId = clientAdder(server, Integer.parseInt(clientMessage[1]));
-	       
-	       //handles 'send' commands from command line
-	       if(cmdType == 'p')
-	       {
-	    	   putHandler(cmd, clientId);   
-	       }
-	       else if(cmdType == 'g')
-	       {
-	    	   getHandler(cmd, clientId); 
-	       }
-	       else if(cmdType == 'd')
-	       {
-	    	   dumpHandler(cmd, clientId); 
-	       }
+    	   clientHandler(server, clientMessage);
        }
        
        server.close();
        
    }
 
+   //handles direct client messages
+	private void clientHandler(Socket server, String[] clientMessage) throws UnknownHostException, IOException, FileNotFoundException 
+	{
+		char[] cmd = clientMessage[0].toCharArray();
+		   char cmdType = cmd[0];
+		   int clientId = -1;
+		   clientId = clientAdder(server, Integer.parseInt(clientMessage[1]));
+		   
+		   //handles 'send' commands from command line
+		   if(cmdType == 'p')
+		   {
+			   putHandler(cmd, clientId);   
+		   }
+		   else if(cmdType == 'g')
+		   {
+			   getHandler(cmd, clientId); 
+		   }
+		   else if(cmdType == 'd')
+		   {
+			   dumpHandler(cmd, clientId); 
+		   }
+	}
+
+	//handles 'TO' messages required for implementing Total Order Multicast
+	private void totalOrderHandler(String[] clientMessage) throws IOException 
+	{
+		System.out.println("checking TO messages");
+		   
+		   //parses the message
+		   String currMsg = clientMessage[2];
+		   int origId = Integer.parseInt(clientMessage[3]);
+		   int currgs = Integer.parseInt(clientMessage[4]);
+		   int clientId = Integer.parseInt(clientMessage[5]);
+		   String logLine = clientMessage[6];
+		   TotalOrderMulticast.TotalOrderInfo curr = linearizability.new TotalOrderInfo(currMsg, currgs, origId);
+		   
+		   //handles broadcast messages
+		   if(clientMessage[1].equals("M"))
+		   {
+			   int seqIndex = linearizability.sequencerCheck(currMsg, origId, linearizability.localSequence);
+			   
+			   if(seqIndex != -1)
+			   {
+				   linearizability.localSequence++;
+				   TotalOrderMulticast.TotalOrderInfo update = linearizability.seqBuffer.remove(seqIndex);
+				   System.out.println("message=> "+update.message+" Id => "+update.id+" global=> "+update.currGlobalSeq );
+				   System.out.println("seqBuffer size =>" + linearizability.seqBuffer.size()+"\n");
+				   respond(clientId, logLine, update, origId);
+			   }
+			   else
+			   {
+				   System.out.println("added to recMessages\n");
+				   linearizability.recMessages.add(curr);
+			   }
+			   
+			   if(sequencer)
+			   {
+				   globalSequence++;
+				   broadcaster(curr.message, true, clientId, logLine, origId);
+			   }
+		   }
+		   
+		   //handles sequencer messages
+		   if(clientMessage[1].equals("S"))
+		   {
+			   int recIndex = linearizability.messagesCheck(currMsg, origId);
+			  
+			   if(recIndex != -1)
+			   {
+				   TotalOrderMulticast.TotalOrderInfo update = linearizability.recMessages.remove(recIndex); 
+				   System.out.println("message=> "+update.message+" Id => "+update.id+" global=> "+update.currGlobalSeq );
+				   System.out.println("recMessages size =>" + linearizability.recMessages.size()+"\n");
+				   
+				   respond(clientId, logLine, update, origId);
+				   
+			   }
+			   else
+			   {
+				   System.out.println("added to seqBuffer");
+				   System.out.println("recMessages size =>" + linearizability.recMessages.size()+"\n");
+				   linearizability.seqBuffer.add(curr);
+			   }
+		   }
+	}
+
+   //Updates data and responds to the client(if client is connected to this server)
    private void respond(int clientId, String logLine, TotalOrderMulticast.TotalOrderInfo update, int origServer) 
    {
 	   String outputWrite = "";
@@ -193,7 +209,7 @@ public class ServerLinear extends Thread
 		   String value = Character.toString(cmd[2]);
 		   data.put(variable, Integer.parseInt(value));
 		   
-		   if(origServer == this.id)
+		   if(origServer == this.id) 
 		   {
 			   outputWrite = logLine.concat(",resp,"+value+"\n");
 			   System.out.println("outputWrite =>" + outputWrite);
@@ -250,12 +266,11 @@ public class ServerLinear extends Thread
            maxClient++;
        }
 	   	
-       
        System.out.println("client size = "+ clients.size());
        return clientId;
    }
    
-   //Handles the 'put' command from the client and updates the output file.
+   //logs the put request and broadcasts the commands
    private void putHandler(char[] cmd,int clientId)
    {
 	   try 
@@ -285,6 +300,7 @@ public class ServerLinear extends Thread
 	   
    }
    
+   //logs the get request and broadcasts the message
    private void getHandler(char[] cmd, int clientId)
    {
 	   try 
@@ -311,6 +327,7 @@ public class ServerLinear extends Thread
 	   }
    }
    
+   //handles the dump command
    private void dumpHandler(char[] cmd ,int clientId) throws FileNotFoundException
    {
 	   @SuppressWarnings("resource")
@@ -351,38 +368,38 @@ public class ServerLinear extends Thread
 	}
 	   
 
-  //returns the id of a process using it's port number
-  private int processIdentifier(int sourcePort) 
-  {
-	  int src = 0;
-	  for(Integer i : replicas.keySet())
-	  {	
-		  if(replicas.get(i).getPort() == sourcePort)
-		  {
-			  src = i;
-			  break;
+	  //returns the id of a process using it's port number
+	  private int processIdentifier(int sourcePort) 
+	  {
+		  int src = 0;
+		  for(Integer i : replicas.keySet())
+		  {	
+			  if(replicas.get(i).getPort() == sourcePort)
+			  {
+				  src = i;
+				  break;
+			  }
 		  }
+		
+		  return src;
 	  }
-	
-	  return src;
-  }
-  
-  //returns the ID of the client at the given port number
-  private int clientIdentifier(int sourcePort) 
-  {
-		int src = -1; 
-		
-		for(Integer i : clients.keySet())
-		{
-			if(clients.get(i).getPort() == sourcePort)
+	  
+	  //returns the ID of the client at the given port number
+	  private int clientIdentifier(int sourcePort) 
+	  {
+			int src = -1; 
+			
+			for(Integer i : clients.keySet())
 			{
-				src = i;
-				break;
+				if(clients.get(i).getPort() == sourcePort)
+				{
+					src = i;
+					break;
+				}
 			}
-		}
-		
-		return src;
-  }
+			
+			return src;
+	  }
    
 
    
