@@ -68,8 +68,6 @@ public class Responder extends Thread {
 		output.close();
 		
 		sendSock.close();
-		  
-		   
 	  }
 	
 	public void dumpResponse() throws IOException
@@ -97,8 +95,7 @@ public class Responder extends Thread {
 				}
 			}
 			else
-			System.out.println("max is smaller than min");
-			
+                System.out.println("max is smaller than min");
 		}
 	}
 	  

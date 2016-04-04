@@ -228,7 +228,8 @@ public class ServerEC extends Thread
            this.mutex2.unlock();
 		   
 		   // Log the request.
-		   logLine = logLine.concat(intId+",put,"+variable+","+System.currentTimeMillis());
+           String unique_id = Integer.toString(this.id) + intId;
+		   logLine = logLine.concat(unique_id+",put,"+variable+","+System.currentTimeMillis());
 		   String logLineReq = logLine.concat(",req,"+value+"\n");
 		   
 		   Writer output = new BufferedWriter(new FileWriter(outputFileName, true));
@@ -275,18 +276,19 @@ public class ServerEC extends Thread
         int timestamp = msg_info.timestamp;
         this.mutex2.unlock();
 
+        String unique_id = Integer.toString(this.id) + intId;
         if (remaining == 0)
         {
             // This means it is a put request.
             if (msg.length == 3)
             {
-                logLine = logLine.concat(intId+",put,"+variable+","+ System.currentTimeMillis());
+                logLine = logLine.concat(unique_id+",put,"+variable+","+ System.currentTimeMillis());
                 cmdType = 1;
             }
             // Otherwise it is a get request.
             else
             {
-                logLine = logLine.concat(intId+",get,"+variable+","+ System.currentTimeMillis());
+                logLine = logLine.concat(unique_id+",get,"+variable+","+ System.currentTimeMillis());
                 cmdType = 2;
             }
             logLine = logLine.concat(",resp,"+value+"\n");
@@ -327,7 +329,8 @@ public class ServerEC extends Thread
 		   String intId = Integer.toString(clientId);
 		   String variable = Character.toString(cmd[1]);
 		   
-		   logLine = logLine.concat(intId+",get,"+variable+","+ System.currentTimeMillis());
+           String unique_id = Integer.toString(this.id) + intId;
+		   logLine = logLine.concat(unique_id+",get,"+variable+","+ System.currentTimeMillis());
 		   String logLineReq = logLine.concat(",req"+"\n");
 		   
 		   Writer output = new BufferedWriter(new FileWriter(outputFileName, true));
