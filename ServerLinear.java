@@ -253,15 +253,12 @@ public class ServerLinear extends Thread
 			   if(data.containsKey(variable))
 			   {
 				   int retVal = data.get(variable);
-				   
-				   if(retVal == -1)
-				   {
-					   outputWrite = logLine.concat(",resp,-1\n");
-				   }
-				   else
-				   {
-					   outputWrite = logLine.concat(",resp,"+Integer.toString(retVal)+"\n");
-				   } 
+				   outputWrite = logLine.concat(",resp,"+Integer.toString(retVal)+"\n");
+
+			   }
+			   else
+			   {
+				   outputWrite = logLine.concat(",resp,-1\n");
 			   }
 			   System.out.println("outputWrite =>" + outputWrite);
 			   
