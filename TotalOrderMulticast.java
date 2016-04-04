@@ -30,22 +30,15 @@ public class TotalOrderMulticast {
 		
 	}
 	
-	public TotalOrderInfo pop()
+	public int messagesCheck(String msg, int id)
 	{
-		if(!this.seqBuffer.isEmpty())
-		{
-			return seqBuffer.remove(this.seqBuffer.size() -1);
-		}
-		
-		return null;
-	}
-	
-	public int messagesCheck(String msg)
-	{
+		System.out.println("looking for id => "+ id +" and message => "+ msg+"in resmessages");
 		for(TotalOrderInfo curr : recMessages )
 		{
-			if(curr.message.equals(msg))
+			
+			if(curr.message.equals(msg) && curr.id == id)
 			{
+				System.out.println("found in rec");
 				return recMessages.indexOf(curr);
 			}
 		}
@@ -53,12 +46,15 @@ public class TotalOrderMulticast {
 		return -1;
 	}
 	
-	public int sequencerCheck(String msg, int ls)
+	public int sequencerCheck(String msg, int id, int ls)
 	{
-		for(TotalOrderInfo curr : seqBuffer )
+		System.out.println("looking for id => "+ id +" and message => "+ msg+"in seqBuffer");
+		for(TotalOrderInfo curr : seqBuffer)
 		{
+			
 			if(curr.message.equals(msg) && (curr.currGlobalSeq == ls+1) )
 			{
+				System.out.println("found in seq");
 				return seqBuffer.indexOf(curr);
 			}
 		}
