@@ -208,9 +208,22 @@ public class ServerLinear extends Thread
 	   {
 		   String value = Character.toString(cmd[2]);
 		   data.put(variable, Integer.parseInt(value));
+		  
 		   
 		   if(origServer == this.id) 
 		   {
+			   String[] message = logLine.split(",");
+			   message[4] = Long.toString(System.currentTimeMillis());
+			   
+			   StringBuilder strBuilder = new StringBuilder();
+			   strBuilder.append(message[0]);
+			   for(int i = 1; i< message.length ; i++)
+			   {
+				   strBuilder.append(","+message[i]);
+			   }
+			   
+			   logLine = strBuilder.toString();
+			   
 			   outputWrite = logLine.concat(",resp,"+value+"\n");
 			   System.out.println("outputWrite =>" + outputWrite);
 			   
@@ -220,8 +233,23 @@ public class ServerLinear extends Thread
 	   }
 	   else if(cmdType == 'g')
 	   {
+		   
 		   if(origServer == this.id)
 		   {
+			   String[] message = logLine.split(",");
+			   message[4] = Long.toString(System.currentTimeMillis());
+			   
+			   StringBuilder strBuilder = new StringBuilder();
+			   strBuilder.append(message[0]);
+			   for(int i = 1; i< message.length ; i++)
+			   {
+				   strBuilder.append(","+message[i]);
+			   }
+			   
+			   logLine = strBuilder.toString();
+			   
+			   System.out.println("message in respond => "+ message);
+			   
 			   if(data.containsKey(variable))
 			   {
 				   int retVal = data.get(variable);
