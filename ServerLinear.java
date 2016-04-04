@@ -283,10 +283,14 @@ public class ServerLinear extends Thread
        int clientPort = cliPort;
        ProcessInfo client = new ProcessInfo(clientIP, clientPort);
        
+  
+       int tempClientId = clientIdentifier(clientPort);
        int clientId = clientIdentifier(clientPort);
-       if(clientId == -1)
+       if(tempClientId == -1)
        {
-    	   clientId = maxClient;
+    	   tempClientId = maxClient;
+    	   String uniqueId = ""+this.id+tempClientId;
+    	   clientId = Integer.parseInt(uniqueId); 
     	   clients.put(clientId, client);
            maxClient++;
        }
