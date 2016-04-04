@@ -94,7 +94,7 @@ public class ServerLinear extends Thread
        
        System.out.println(server.getRemoteSocketAddress());
        System.out.println("message rcvd => ("+ message+")");
-       
+      
        String[] clientMessage = message.split(" ");
        
        if(clientMessage[0].equals("TO"))
@@ -102,15 +102,15 @@ public class ServerLinear extends Thread
     	   System.out.println("checking TO messages");
     	   
     	   String currMsg = clientMessage[2];
-    	   int currId = Integer.parseInt(clientMessage[3]);
+    	   int origId = Integer.parseInt(clientMessage[3]);
     	   int currgs = Integer.parseInt(clientMessage[4]);
     	   int clientId = Integer.parseInt(clientMessage[5]);
     	   String logLine = clientMessage[6];
-    	   TotalOrderMulticast.TotalOrderInfo curr = linearizability.new TotalOrderInfo(currMsg, currgs, currId);
+    	   TotalOrderMulticast.TotalOrderInfo curr = linearizability.new TotalOrderInfo(currMsg, currgs, origId);
     	   
     	   if(clientMessage[1].equals("M"))
     	   {
-    		   int seqIndex = linearizability.sequencerCheck(currMsg, currId, linearizability.localSequence);
+    		   int seqIndex = linearizability.sequencerCheck(currMsg, origId, linearizability.localSequence);
     		   
     		   if(seqIndex != -1)
     		   {
@@ -118,7 +118,7 @@ public class ServerLinear extends Thread
     			   TotalOrderMulticast.TotalOrderInfo update = linearizability.seqBuffer.remove(seqIndex);
     			   System.out.println("message=> "+update.message+" Id => "+update.id+" global=> "+update.currGlobalSeq );
     			   System.out.println("seqBuffer size =>" + linearizability.seqBuffer.size()+"\n");
-    			   respond(clientId, logLine, update);
+    			   respond(clientId, logLine, update, origId);
     		   }
     		   else
     		   {
@@ -129,13 +129,13 @@ public class ServerLinear extends Thread
     		   if(sequencer)
     		   {
     			   globalSequence++;
-    			   broadcaster(curr.message, true, clientId, logLine, currId);
+    			   broadcaster(curr.message, true, clientId, logLine, origId);
     		   }
     	   }
     	   
     	   if(clientMessage[1].equals("S"))
     	   {
-    		   int recIndex = linearizability.messagesCheck(currMsg, currId);
+    		   int recIndex = linearizability.messagesCheck(currMsg, origId);
     		  
     		   if(recIndex != -1)
     		   {
@@ -143,7 +143,7 @@ public class ServerLinear extends Thread
     			   System.out.println("message=> "+update.message+" Id => "+update.id+" global=> "+update.currGlobalSeq );
     			   System.out.println("recMessages size =>" + linearizability.recMessages.size()+"\n");
     			   
-    			   respond(clientId, logLine, update);
+    			   respond(clientId, logLine, update, origId);
     			   
     		   }
     		   else
@@ -181,7 +181,7 @@ public class ServerLinear extends Thread
        
    }
 
-   private void respond(int clientId, String logLine, TotalOrderMulticast.TotalOrderInfo update) 
+   private void respond(int clientId, String logLine, TotalOrderMulticast.TotalOrderInfo update, int origServer) 
    {
 	   String outputWrite = "";
 	   char[] cmd = update.message.toCharArray();
@@ -192,29 +192,39 @@ public class ServerLinear extends Thread
 	   {
 		   String value = Character.toString(cmd[2]);
 		   data.put(variable, Integer.parseInt(value));
-		   outputWrite = logLine.concat(",resp,"+value+"\n");
-		   System.out.println("outputWrite =>" + outputWrite);
-		   ResponderLinear responderLinear = new ResponderLinear(outputWrite, clients.get(clientId), outputFileName, 1);
-		   responderLinear.start();
+		   
+		   if(origServer == this.id)
+		   {
+			   outputWrite = logLine.concat(",resp,"+value+"\n");
+			   System.out.println("outputWrite =>" + outputWrite);
+			   
+			   ResponderLinear responderLinear = new ResponderLinear(outputWrite, clients.get(clientId), outputFileName, 1);
+			   responderLinear.start();
+		   }
 	   }
 	   else if(cmdType == 'g')
 	   {
-		   if(data.containsKey(variable))
+		   if(origServer == this.id)
 		   {
-			   int retVal = data.get(variable);
-			   
-			   if(retVal == -1)
+			   if(data.containsKey(variable))
 			   {
-				   outputWrite = logLine.concat(",resp,-1\n");
+				   int retVal = data.get(variable);
+				   
+				   if(retVal == -1)
+				   {
+					   outputWrite = logLine.concat(",resp,-1\n");
+				   }
+				   else
+				   {
+					   outputWrite = logLine.concat(",resp,"+Integer.toString(retVal)+"\n");
+				   } 
 			   }
-			   else
-			   {
-				   outputWrite = logLine.concat(",resp,"+Integer.toString(retVal)+"\n");
-			   } 
+			   System.out.println("outputWrite =>" + outputWrite);
+			   
+			   
+			   ResponderLinear responderLinear = new ResponderLinear(outputWrite, clients.get(clientId), outputFileName, 2);
+			   responderLinear.start();
 		   }
-		   System.out.println("outputWrite =>" + outputWrite);
-		   ResponderLinear responderLinear = new ResponderLinear(outputWrite, clients.get(clientId), outputFileName, 2);
-		   responderLinear.start();
 		   
 	   }
    }
