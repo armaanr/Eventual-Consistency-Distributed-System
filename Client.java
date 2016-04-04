@@ -7,6 +7,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class Client extends Thread
 {
+    String scheme;
+
     // Information from configuration file.
     public int min_delay;
     public int max_delay;
@@ -57,7 +59,7 @@ public class Client extends Thread
      * The rest of the fields are filled in by the configuration
      * file parser.
      */
-    public Client(int client_port, int server_id)
+    public Client(int client_port, int server_id, String scheme)
     {
         try
         {
@@ -69,6 +71,7 @@ public class Client extends Thread
             this.Q = new ConcurrentLinkedQueue<String>();
             this.need_ack = false;
             this.mutex = new ReentrantLock(true);
+            this.scheme = scheme;
         }
         catch (IOException e)
         {
@@ -209,7 +212,7 @@ public class Client extends Thread
             // Gets client's id and server's id from command line args.
             int client_port = Integer.parseInt(args[0]);
             int server_id = Integer.parseInt(args[1]);
-            Client client = new Client(client_port, server_id);
+            Client client = new Client(client_port, server_id, argv[3]);
 
             // Parses config file get information about all nodes.
             String fileName = args[2];
@@ -301,7 +304,7 @@ public class Client extends Thread
                 receive_ack();
             }
             catch (SocketTimeoutException s) {
-                if (this.need_ack && (System.currentTimeMillis() - this.max_delay*2) > this.last_sent)
+                if (this.scheme.equals("E") && this.need_ack && (System.currentTimeMillis() - this.max_delay*2) > this.last_sent)
                 {
                     this.need_ack = false;
                     this.reset("drop");
