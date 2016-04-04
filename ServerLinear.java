@@ -92,8 +92,8 @@ public class ServerLinear extends Thread
        String message = "";
        message = in.readUTF();  
        
-       System.out.println(server.getRemoteSocketAddress());
-       System.out.println("message rcvd => ("+ message+")");
+       //System.out.println(server.getRemoteSocketAddress());
+       //System.out.println("message rcvd => ("+ message+")");
       
        String[] clientMessage = message.split(" ");
        
@@ -137,7 +137,7 @@ public class ServerLinear extends Thread
 	//handles 'TO' messages required for implementing Total Order Multicast
 	private void totalOrderHandler(String[] clientMessage) throws IOException 
 	{
-		System.out.println("checking TO messages");
+		//System.out.println("checking TO messages");
 		   
 		   //parses the message
 		   String currMsg = clientMessage[2];
@@ -156,13 +156,13 @@ public class ServerLinear extends Thread
 			   {
 				   linearizability.localSequence++;
 				   TotalOrderMulticast.TotalOrderInfo update = linearizability.seqBuffer.remove(seqIndex);
-				   System.out.println("message=> "+update.message+" Id => "+update.id+" global=> "+update.currGlobalSeq );
-				   System.out.println("seqBuffer size =>" + linearizability.seqBuffer.size()+"\n");
+				   //System.out.println("message=> "+update.message+" Id => "+update.id+" global=> "+update.currGlobalSeq );
+				   //System.out.println("seqBuffer size =>" + linearizability.seqBuffer.size()+"\n");
 				   respond(clientId, logLine, update, origId);
 			   }
 			   else
 			   {
-				   System.out.println("added to recMessages\n");
+				   //System.out.println("added to recMessages\n");
 				   linearizability.recMessages.add(curr);
 			   }
 			   
@@ -181,16 +181,16 @@ public class ServerLinear extends Thread
 			   if(recIndex != -1)
 			   {
 				   TotalOrderMulticast.TotalOrderInfo update = linearizability.recMessages.remove(recIndex); 
-				   System.out.println("message=> "+update.message+" Id => "+update.id+" global=> "+update.currGlobalSeq );
-				   System.out.println("recMessages size =>" + linearizability.recMessages.size()+"\n");
+				   //System.out.println("message=> "+update.message+" Id => "+update.id+" global=> "+update.currGlobalSeq );
+				   //System.out.println("recMessages size =>" + linearizability.recMessages.size()+"\n");
 				   
 				   respond(clientId, logLine, update, origId);
 				   
 			   }
 			   else
 			   {
-				   System.out.println("added to seqBuffer");
-				   System.out.println("recMessages size =>" + linearizability.recMessages.size()+"\n");
+				   //System.out.println("added to seqBuffer");
+				   //System.out.println("recMessages size =>" + linearizability.recMessages.size()+"\n");
 				   linearizability.seqBuffer.add(curr);
 			   }
 		   }
@@ -225,7 +225,7 @@ public class ServerLinear extends Thread
 			   logLine = strBuilder.toString();
 			   
 			   outputWrite = logLine.concat(",resp,"+value+"\n");
-			   System.out.println("outputWrite =>" + outputWrite);
+			   //System.out.println("outputWrite =>" + outputWrite);
 			   
 			   ResponderLinear responderLinear = new ResponderLinear(outputWrite, clients.get(clientId), outputFileName, 1);
 			   responderLinear.start();
@@ -248,7 +248,7 @@ public class ServerLinear extends Thread
 			   
 			   logLine = strBuilder.toString();
 			   
-			   System.out.println("message in respond => "+ message);
+			   //System.out.println("message in respond => "+ message);
 			   
 			   if(data.containsKey(variable))
 			   {
@@ -260,7 +260,7 @@ public class ServerLinear extends Thread
 			   {
 				   outputWrite = logLine.concat(",resp,-1\n");
 			   }
-			   System.out.println("outputWrite =>" + outputWrite);
+			   //System.out.println("outputWrite =>" + outputWrite);
 			   
 			   
 			   ResponderLinear responderLinear = new ResponderLinear(outputWrite, clients.get(clientId), outputFileName, 2);
@@ -295,7 +295,7 @@ public class ServerLinear extends Thread
            maxClient++;
        }
 	   	
-       System.out.println("client size = "+ clients.size());
+       //System.out.println("client size = "+ clients.size());
        return clientId;
    }
    
