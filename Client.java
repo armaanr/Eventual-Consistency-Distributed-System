@@ -212,7 +212,7 @@ public class Client extends Thread
             // Gets client's id and server's id from command line args.
             int client_port = Integer.parseInt(args[0]);
             int server_id = Integer.parseInt(args[1]);
-            Client client = new Client(client_port, server_id, argv[3]);
+            Client client = new Client(client_port, server_id, args[3]);
 
             // Parses config file get information about all nodes.
             String fileName = args[2];
